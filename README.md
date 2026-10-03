@@ -2,7 +2,7 @@
 
 Orquestrador backend para uma campanha solo de D&D 2024, com separação entre regras, estado e narrativa.
 
-**Estado:** o MVP e o contrato local de resposta estão na branch `feat/mj-dnd-2024-mvp`; o PR #1 continua aberto como draft. Os 68 testes são locais/simulados. Não houve deploy nem teste contra os serviços reais. Nenhuma mecânica D&D foi implementada. O frontend não faz parte desta etapa.
+**Estado:** o MVP e os contratos locais estão na branch `feat/mj-dnd-2024-mvp`; o PR #1 continua aberto como draft. Os 79 testes são locais/simulados. Não houve deploy nem teste contra os serviços reais. Nenhuma mecânica D&D foi implementada. O frontend não faz parte desta etapa.
 
 ## Arquitetura
 
@@ -72,6 +72,7 @@ O armazenamento implementado é SQLite. PostgreSQL e persistência durável no R
 - `docs/PIPELINE.md`: fluxo operacional, incluindo fail-closed.
 - `docs/RULE_ENGINE_CONTRACT_V1.md`: envelope de estado local enviado dentro de `state`.
 - `docs/RULE_RESOLUTION_CONTRACT_V1.md`: validação da resposta V1, autorização e projeção segura ao MiMo.
+- `docs/NARRATOR_INPUT_CONTRACT_V1.md`: fronteira versionada e allowlisted entre o orquestrador e o narrador.
 - `docs/INTEGRATION_STATUS.md`: diferença entre testes simulados e integração real.
 - `docs/CODE_REVIEW.md`: achados e limitações.
 - `docs/UX_BEGINNER_SPEC.md`: especificação UX recebida.

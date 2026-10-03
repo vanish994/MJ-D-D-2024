@@ -2,9 +2,11 @@ import json
 from pathlib import Path
 
 import httpx
+from pydantic import ValidationError
 
 from app.config import settings
 from app.services.errors import ExternalServiceError
+from app.services.narrator_input import NarratorInput
 
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "narrator.md"
@@ -16,11 +18,17 @@ class MimoClient:
 
     async def narrate(
         self,
-        campaign_id: str,
-        scene: dict,
-        player_input: str,
-        facts: dict,
+        narrator_input: NarratorInput | dict,
     ) -> str:
+        try:
+            validated_input = (
+                narrator_input
+                if isinstance(narrator_input, NarratorInput)
+                else NarratorInput.model_validate(narrator_input)
+            )
+        except ValidationError as exc:
+            raise ExternalServiceError("mimo_proxy", "invalid_narrator_input") from exc
+
         try:
             system_prompt = PROMPT_PATH.read_text(encoding="utf-8")
         except OSError as exc:
@@ -29,15 +37,13 @@ class MimoClient:
         headers = {"Content-Type": "application/json"}
         if settings.mimo_api_key:
             headers["Authorization"] = f"Bearer {settings.mimo_api_key}"
-        turn_data = {
-            "campaign_id": campaign_id,
-            "scene": scene,
-            "FATOS_RESOLVIDOS": facts if facts else {},
-            "player_input": player_input,
-        }
+        turn_data = validated_input.model_dump(mode="json")
+        # The local prompt still names the validated facts FATOS_RESOLVIDOS.
+        # Keep an exact alias until the prompt is migrated in a separate task.
+        turn_data["FATOS_RESOLVIDOS"] = turn_data["resolved_facts"]
         payload = {
             "model": "mimo-v2.5-no-thinking",
-            "user": campaign_id,
+            "user": validated_input.campaign.campaign_id,
             "stream": False,
             "messages": [
                 {"role": "system", "content": system_prompt},

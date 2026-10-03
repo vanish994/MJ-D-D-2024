@@ -116,7 +116,9 @@ class UXApiTests(unittest.TestCase):
         self.assertEqual(data["facts_resolvidos"], {})
         self.assertEqual(data["rule_feedback"]["message"], "A Ação Bônus já foi utilizada neste turno.")
         self.assertEqual(data["campaign"]["mechanical_state"], {})
-        self.assertEqual(fake_mimo.narrate.await_args.args[-1], {})
+        narrator_input = fake_mimo.narrate.await_args.args[0]
+        self.assertEqual(narrator_input.resolved_facts, {})
+        self.assertEqual(narrator_input.ux_context, {})
 
     def test_long_rest_summary_comes_only_from_resolved_engine_payload(self):
         campaign_id = self._campaign_id()

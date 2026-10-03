@@ -68,7 +68,7 @@ class OrchestratorApiTests(unittest.TestCase):
         self.assertEqual(result["resolution_status"], "needs_rule_validation")
         self.assertEqual(result["campaign"]["mechanical_state"], {"hp": 12})
         self.assertTrue(result["narrative"])
-        self.assertEqual(fake_mimo.narrate.await_args.args[-1], {})
+        self.assertEqual(fake_mimo.narrate.await_args.args[0].resolved_facts, {})
 
     def test_dialogue_turn_calls_rule_engine_before_mimo(self):
         campaign_id = self.client.post("/v1/campaigns", json={"name": "Campanha"}).json()["id"]
@@ -97,7 +97,7 @@ class OrchestratorApiTests(unittest.TestCase):
 
         async def narrate(*args):
             events.append("mimo")
-            self.assertEqual(args[-1], {})
+            self.assertEqual(args[0].resolved_facts, {})
             return "O mercador responde."
 
         fake_rules = SimpleNamespace(resolve=AsyncMock(side_effect=resolve))

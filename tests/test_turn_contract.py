@@ -145,12 +145,13 @@ class FailClosedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent_state["mechanical_state"], {"hp": 9})
         self.assertEqual(sent_state["intent"]["classification"], "mechanical_likely")
         self.assertEqual(sent_state["intent"]["player_input"], "Eu ataco o alvo.")
-        mimo.narrate.assert_awaited_once_with(
-            "campaign-123",
-            {"location": "Old bridge"},
-            "Eu ataco o alvo.",
-            {},
-        )
+        mimo.narrate.assert_awaited_once()
+        narrator_input = mimo.narrate.await_args.args[0]
+        self.assertEqual(narrator_input.campaign.campaign_id, "campaign-123")
+        self.assertEqual(narrator_input.scene, {"location": "Old bridge"})
+        self.assertEqual(narrator_input.player_input, "Eu ataco o alvo.")
+        self.assertEqual(narrator_input.resolved_facts, {})
+        self.assertEqual(narrator_input.ux_context, {})
 
 
 if __name__ == "__main__":

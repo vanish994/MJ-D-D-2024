@@ -64,9 +64,12 @@ class TurnServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, "needs_rule_validation")
         self.assertEqual(feedback["type"], "rule_validation")
         self.assertEqual(campaign["mechanical_state"], {"hp": 10})
-        fake_mimo.narrate.assert_awaited_once_with(
-            "campaign-test", {}, "Eu tento atacar o guardião.", {}
-        )
+        fake_mimo.narrate.assert_awaited_once()
+        narrator_input = fake_mimo.narrate.await_args.args[0]
+        self.assertEqual(narrator_input.schema_version, "narrator-input-v1")
+        self.assertEqual(narrator_input.campaign.campaign_id, "campaign-test")
+        self.assertEqual(narrator_input.player_input, "Eu tento atacar o guardião.")
+        self.assertEqual(narrator_input.resolved_facts, {})
         self.assertEqual(narrative, "A cena continua em suspense.")
         self.assertTrue(turn_id)
         self.assertEqual(self.snapshots[0]["history"][0]["narrative_status"], "pending")
@@ -90,7 +93,7 @@ class TurnServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(facts["status"], "resolved")
         self.assertEqual(campaign["mechanical_state"]["hp"], 7)
         self.assertEqual(campaign["history"][0]["facts_resolvidos"], facts)
-        self.assertEqual(fake_mimo.narrate.await_args.args[-1], facts)
+        self.assertEqual(fake_mimo.narrate.await_args.args[0].resolved_facts, facts)
         self.assertEqual(self.snapshots[0]["mechanical_state"]["hp"], 7)
 
     async def test_malformed_or_unresolved_nested_facts_fail_closed(self):
@@ -111,7 +114,7 @@ class TurnServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(facts, {})
         self.assertEqual(status, "needs_rule_validation")
         self.assertEqual(campaign["mechanical_state"]["hp"], 10)
-        self.assertEqual(fake_mimo.narrate.await_args.args[-1], {})
+        self.assertEqual(fake_mimo.narrate.await_args.args[0].resolved_facts, {})
 
     async def test_bad_state_change_key_rejects_the_entire_facts_object(self):
         response = resolved_response()

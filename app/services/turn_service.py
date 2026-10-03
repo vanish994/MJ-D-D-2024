@@ -7,6 +7,7 @@ from typing import Any
 from app.services.campaign_service import get, save
 from app.services.errors import CampaignNotFound, ExternalServiceError
 from app.services.mimo_client import MimoClient
+from app.services.narrator_input import build_narrator_input
 from app.services.resolution_contract import (
     ResolutionContractError,
     ValidatedResolution,
@@ -142,13 +143,8 @@ async def process_turn(campaign_id: str, player_input: str):
     # Persist validated state and a pending turn before calling the narrator.
     save(campaign)
     try:
-        scene = campaign.get("scene", {})
-        narrative = await mimo.narrate(
-            campaign_id,
-            scene if isinstance(scene, dict) else {},
-            player_input,
-            facts,
-        )
+        narrator_input = build_narrator_input(campaign, player_input, resolution)
+        narrative = await mimo.narrate(narrator_input)
     except ExternalServiceError:
         turn_record["narrative_status"] = "failed"
         save(campaign)

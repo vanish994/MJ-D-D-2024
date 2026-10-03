@@ -1,6 +1,7 @@
 import unittest
 
 from app.services.turn_service import _rule_feedback
+from app.services.resolution_contract import ValidatedResolution
 from app.services.ux_assistant import format_long_rest_summary, project_combat_ux
 
 
@@ -58,8 +59,12 @@ class UXAssistantTests(unittest.TestCase):
 
     def test_invalid_action_message_is_only_the_rule_engine_reason(self):
         feedback = _rule_feedback(
-            {"status": "invalid_action", "reason": "A Ação Bônus já foi utilizada."},
-            "invalid_action",
+            ValidatedResolution(
+                status="invalid_action",
+                narrator_facts={},
+                state_changes={},
+                reason="A Ação Bônus já foi utilizada.",
+            ),
         )
         self.assertEqual(feedback, {
             "type": "invalid_action",

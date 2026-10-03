@@ -1,44 +1,43 @@
-# Code Review — MJ-D-D-2024 MVP
+# Code Review — MJ-D-D-2024 MVP e `rule-resolution-v1`
 
 ## Resumo
 
-O PR implementa um backend FastAPI para o MJ, com campanhas, orquestração Rule Engine → MiMo, persistência SQLite, adapters, testes e uma projeção UX conservadora. A arquitetura local é coerente e a suíte simulada passa; o projeto ainda não é um D&D 2024 mecanicamente jogável nem está pronto para produção pública.
+A mudança valida e projeta respostas do Rule Engine por um contrato versionado, aplica alterações de estado somente em respostas `resolved` válidas e envia `{}` ao MiMo em status pendentes ou inválidos. O fluxo preserva o contrato HTTP externo; nenhuma mecânica D&D ou integração real foi adicionada.
 
-**Veredito:** apto como scaffold/MVP de orquestração em PR; não declarar integração real nem gameplay mecânico concluído.
+**Veredito:** aprovado como alteração de contrato local e fail-closed; não significa que os serviços externos implementem o schema.
 
-## Achados críticos antes de uso público com campanhas reais
+## Achados críticos
 
-1. **Sem autenticação/autorização.** `app/main.py` monta as rotas sem identidade/ownership; `app/api/campaigns.py` permite ler campanha por UUID. CORS não protege chamadas diretas. Implementar autenticação e associação jogador/campanha antes de armazenar dados reais.
-2. **Persistência Render não durável.** `app/storage/db.py` aceita somente SQLite e o manifesto não provisiona armazenamento persistente. O filesystem efêmero pode perder campanhas após reinício/redeploy.
+Nenhum bloqueador identificado nesta revisão local. Antes de uso público com campanhas reais, permanecem os riscos preexistentes de autenticação/autorização ausente e persistência SQLite não durável no Render.
 
-## Pendências funcionais e de integração
+## Questões importantes ainda abertas
 
-1. **Rule Engine real ainda fail-closed.** A revisão fornecida pelo usuário informa que o `/v1/resolve` atual retorna `needs_rule_validation` e fatos vazios. Não foi feita chamada real nesta tarefa; de acordo com essa checagem, ataques, testes, dano, CDs e descanso ainda não são resolvidos. A implementação correta no MJ é não inventar resultado; a resolução determinística pertence a uma etapa separada do motor de regras.
-2. **Integração real não testada.** Os 52 testes usam mocks. Faltam URLs/credenciais reais e chamadas aos endpoints reais `/health`, `/v1/resolve` e `/v1/chat/completions`.
-3. **Contrato de intenção é provisório.** O MJ agora envolve o estado da campanha em `mj-rule-state-v1`, mas `intent` continua sendo classificação lexical + fala original, sem parser estruturado de ator/alvo/movimento/arma. `RuleEngineClient.resolve` continua enviando `player_input` na chave externa `action` para preservar compatibilidade; o backend externo ainda não interpreta o novo envelope. Não alterar um lado unilateralmente.
-4. **UX depende de dados inexistentes no contrato real.** Opções, recursos, snapshots atuais e resumo de descanso só aparecem se fornecidos e validados pelo Rule Engine. A projeção falha de forma segura, mas provavelmente retornará indisponível com o serviço atual.
-5. **Frontend não incluído.** A API disponibiliza rotas para uma futura UI, mas nenhum frontend foi implementado. O projeto é provider-agnostic; a interface pode ser incluída aqui ou decidida separadamente.
-6. **Explicação progressiva ainda parcial.** O modo avançado oculta `explanation`; iniciantes/normal recebem o texto explícito do Rule Engine. Glossário e orientação visual progressiva exigem conteúdo confiável e UI.
+1. **Integração real não testada.** Os testes usam mocks. URL, credenciais e chamadas reais a `/health`, `/v1/resolve` e `/v1/chat/completions` continuam pendentes; o Rule Engine pode responder apenas com o formato legacy `needs_rule_validation`.
+2. **Schema V1 não negociado com o backend externo.** `rule-resolution-v1` é validação local no MJ. Uma resposta `resolved` real só poderá ser aceita depois que o serviço externo produzir esse formato e for testado ponta a ponta.
+3. **Sem resolução mecânica.** Esta mudança não implementa ataques, testes, RNG, dano, CDs, iniciativa, condições, descanso ou personagens. A Knowledge Base continua sendo evidência/candidata, não uma regra executável automática.
+4. **Intenção continua provisória.** `mj-rule-state-v1` preserva a fala e metadados lexicais; não é parsing estruturado nem contrato negociado com o Rule Engine.
+5. **Segurança e operação preexistentes.** A API não associa campanhas a uma identidade autenticada e o armazenamento SQLite não é durável no Render. Não fazer deploy nesta etapa.
 
 ## Pontos menores
 
-- `stream=true` ainda retorna `501`; streaming não faz parte deste MVP.
-- O classificador de intenção continua lexical e apenas anota o turno; não é um parser estruturado e não deve ser tratado como tal.
+- `stream=true` retorna `501`; streaming continua fora do escopo.
+- O classificador lexical é consultivo e não decide roteamento nem resultados.
 
 ## Pontos positivos
 
-- Toda fala, inclusive diálogo, percorre Rule Engine antes do MiMo; o teste verifica a ordem.
-- Só fatos `resolved` validados podem aplicar mudanças de estado; fatos vazios são enviados em casos não resolvidos.
-- O MiMo permanece narrador e recebe prompt separado; não recebe autoridade mecânica.
-- SQL parametrizado, limites de payload/estado e validação estrita reduzem risco de dados malformados.
-- Campos UX ausentes não são preenchidos com defaults inventados.
+- Contrato explícito com enum de seis status, tipos estritos, rejeição de campos desconhecidos e limites de payload/coleções; JSON profundamente aninhado falha de forma controlada.
+- Status diferente de `resolved` descarta fatos, snapshots, referências e mudanças de estado; formato legacy é limitado ao objeto mínimo `needs_rule_validation`.
+- Respostas `resolved` são projetadas por allowlist; `request`, `reason` e `message` não são encaminhados como fatos.
+- Mudanças de estado aceitam apenas mapa limitado com valores escalares, e conflitos com o formato nested legacy falham fechados.
+- Rule Engine continua antes do MiMo; mocks verificam a ordem e a ausência de fatos quando não há resolução.
+- Documentação separa `mj-rule-state-v1` do novo contrato de resposta e não alega compatibilidade real.
 
-## Cobertura
+## Cobertura de testes
 
-**52 testes passaram** com dependências fixadas e mocks; o smoke test local de `GET /health` passou. Isso não comprova os serviços reais.
+**68 testes passaram** com dependências fixadas, incluindo contrato, dados inválidos, seis status, fail-closed, pipeline, APIs e adapters com mocks. `compileall` e `git diff --check` também passaram. Nenhum desses testes é uma integração real.
 
 ## Perguntas para a próxima etapa
 
-1. Qual será o contrato/versionamento para intenção estruturada entre MJ e Rule Engine?
-2. A mecânica determinística será implementada no Rule Engine em uma etapa futura, mediante autorização explícita para esse repositório externo?
-3. Qual autenticação e armazenamento durável serão usados antes da publicação pública?
+1. Quando o Rule Engine externo poderá produzir e documentar `rule-resolution-v1`?
+2. Qual autenticação e banco persistente serão escolhidos antes de qualquer publicação pública?
+3. O contrato de intenção estruturada será versionado em etapa separada, com autorização explícita sobre o serviço externo?

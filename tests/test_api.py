@@ -11,6 +11,7 @@ from app.config import settings
 from app.main import app
 from app.services import turn_service
 from app.services.campaign_service import get, save
+from app.services.resolution_contract import RULE_RESOLUTION_SCHEMA_VERSION
 from app.services.turn_contract import build_rule_state
 
 
@@ -89,7 +90,10 @@ class OrchestratorApiTests(unittest.TestCase):
                     scene={},
                 ),
             )
-            return {"status": "narrative_only"}
+            return {
+                "schema_version": RULE_RESOLUTION_SCHEMA_VERSION,
+                "status": "awaiting_input",
+            }
 
         async def narrate(*args):
             events.append("mimo")
@@ -110,7 +114,7 @@ class OrchestratorApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(events, ["rule_engine", "mimo"])
         self.assertEqual(response.json()["facts_resolvidos"], {})
-        self.assertEqual(response.json()["resolution_status"], "narrative_only")
+        self.assertEqual(response.json()["resolution_status"], "awaiting_input")
 
     def test_stream_true_is_rejected_instead_of_silently_ignored(self):
         campaign_id = self.client.post("/v1/campaigns", json={"name": "Campanha"}).json()["id"]

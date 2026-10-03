@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from app.services import turn_service
+from app.services.resolution_contract import RULE_RESOLUTION_SCHEMA_VERSION
 from app.services.turn_contract import RULE_STATE_SCHEMA_VERSION, build_rule_state
 
 
@@ -110,6 +111,7 @@ class FailClosedPipelineTests(unittest.IsolatedAsyncioTestCase):
         rules = SimpleNamespace(
             resolve=AsyncMock(
                 return_value={
+                    "schema_version": RULE_RESOLUTION_SCHEMA_VERSION,
                     "status": "needs_rule_validation",
                     "facts_resolvidos": {
                         "status": "resolved",

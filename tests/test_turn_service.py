@@ -5,23 +5,27 @@ from unittest.mock import AsyncMock, patch
 
 from app.services.errors import ExternalServiceError
 from app.services import turn_service
+from app.services.resolution_contract import RULE_RESOLUTION_SCHEMA_VERSION
 from app.services.turn_contract import build_rule_state
 
 
 def resolved_response():
     return {
+        "schema_version": RULE_RESOLUTION_SCHEMA_VERSION,
+        "resolution_id": "res-test-1",
         "status": "resolved",
+        "action": {"type": "attack_roll", "actor_id": "character-test"},
+        "check": {"ability": "strength", "dc": 15, "modifier": 3},
+        "rolls": [{"type": "d20", "result": 17}],
+        "outcome": {"success": True, "total": 20},
         "facts_resolvidos": {
             "resolution_id": "res-test-1",
             "status": "resolved",
-            "action": "attack_roll",
-            "outcome": "hit",
-            "rolls": [{"formula": "1d20", "dice": [{"sides": 20, "result": 17}], "modifier": 3, "total": 20}],
-            "damage": None,
-            "conditions_applied": [],
             "state_changes": [{"key": "hp", "value": 7}],
             "rules_used": ["rule-ref-test"],
         },
+        "state_changes": {"hp": 7},
+        "rules_used": ["rule-ref-test"],
     }
 
 
@@ -127,12 +131,15 @@ class TurnServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, "needs_rule_validation")
         self.assertEqual(campaign["mechanical_state"]["hp"], 10)
 
-    async def test_narrative_only_turn_calls_rule_engine_before_mimo(self):
+    async def test_dialogue_turn_calls_rule_engine_before_mimo(self):
         events = []
 
         async def resolve(_action, _state):
             events.append("rule_engine")
-            return {"status": "narrative_only"}
+            return {
+                "schema_version": RULE_RESOLUTION_SCHEMA_VERSION,
+                "status": "awaiting_input",
+            }
 
         async def narrate(*_args):
             events.append("mimo")
@@ -164,8 +171,8 @@ class TurnServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(events, ["rule_engine", "mimo"])
         self.assertEqual(facts, {})
-        self.assertEqual(status, "narrative_only")
-        self.assertIsNone(feedback)
+        self.assertEqual(status, "awaiting_input")
+        self.assertEqual(feedback["status"], "awaiting_input")
         self.assertEqual(
             campaign["history"][0]["intent_classification"], "narrative_or_unknown"
         )

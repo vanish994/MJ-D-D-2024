@@ -2,7 +2,7 @@
 
 ## O que foi validado localmente
 
-A suíte cobre o orquestrador, persistência SQLite temporária, contratos HTTP dos adapters com `httpx.MockTransport`, endpoints FastAPI com mocks, ordem Rule Engine → MiMo inclusive em diálogo, fail-closed, feedback de ação inválida, snapshot UX, modos de explicação e resumo de descanso longo. **Mocks são somente testes: não comprovam disponibilidade nem compatibilidade dos serviços reais.**
+A suíte cobre o orquestrador, persistência SQLite temporária, contratos HTTP dos adapters com `httpx.MockTransport`, endpoints FastAPI com mocks, ordem Rule Engine → MiMo inclusive em diálogo, fail-closed, feedback de ação inválida, snapshot UX, modos de explicação, resumo de descanso longo e validação/projeção de `rule-resolution-v1`. **Mocks são somente testes: não comprovam disponibilidade nem compatibilidade dos serviços reais.**
 
 ## Rule Engine externo
 
@@ -13,6 +13,8 @@ Quando houver um contrato mecânico disponível, testar no serviço real:
 1. `GET {RULE_ENGINE_URL}/health`.
 2. `POST {RULE_ENGINE_URL}/v1/resolve` com diálogo e casos aprovados de ação; conferir autenticação, schema, status e `FATOS_RESOLVIDOS`.
 3. Confirmar contrato versionado para intenção estruturada e `ux_snapshot`. O MJ agora envia o envelope local `mj-rule-state-v1` dentro de `state`, mas o adapter preserva a chave externa `action` com a fala original e não altera `/v1/resolve`; o serviço atual não interpreta esse envelope nem resolve mecânicas.
+
+O MJ valida respostas resolvidas conforme `docs/RULE_RESOLUTION_CONTRACT_V1.md`. Somente o status legacy mínimo `{"status":"needs_rule_validation"}` é aceito sem versão; isso não significa que o Rule Engine tenha implementado `rule-resolution-v1`. Uma resposta resolvida real precisa ser testada contra o serviço antes de considerar a integração completa.
 
 Não alterar `dnd-byonder-backend` sem autorização explícita.
 

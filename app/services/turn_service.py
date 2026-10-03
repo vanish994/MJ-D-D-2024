@@ -1,16 +1,18 @@
-import json
 import re
 import unicodedata
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from pydantic import ValidationError
-
-from app.models import FactsResolved
 from app.services.campaign_service import get, save
 from app.services.errors import CampaignNotFound, ExternalServiceError
 from app.services.mimo_client import MimoClient
+from app.services.resolution_contract import (
+    ResolutionContractError,
+    ValidatedResolution,
+    fail_closed_resolution,
+    validate_resolution_response,
+)
 from app.services.rule_engine_client import RuleEngineClient
 from app.services.turn_contract import build_rule_state
 
@@ -30,9 +32,6 @@ MECHANICAL_TERMS = (
     "intimido", "enganar", "engano", "convencer", "convenço", "attack", "roll",
     "saving throw", "damage", "initiative", "spell", "open the door",
 )
-STATE_KEY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
-MAX_STATE_CHANGES = 32
-MAX_FACTS_BYTES = 50_000
 MAX_FEEDBACK_LENGTH = 500
 MAX_HISTORY = 50
 
@@ -57,63 +56,38 @@ def classify_intent(text: str) -> str:
     return "mechanical_likely" if looks_mechanical(text) else "narrative_or_unknown"
 
 
-def _validated_facts(resolution: Any) -> tuple[dict[str, Any], str]:
-    if not isinstance(resolution, dict):
-        return {}, "needs_rule_validation"
-    status = resolution.get("status")
-    if status != "resolved":
-        return {}, status if isinstance(status, str) else "needs_rule_validation"
-
-    raw_facts = resolution.get("facts_resolvidos")
-    if raw_facts is None:
-        raw_facts = resolution.get("FATOS_RESOLVIDOS")
-    if not isinstance(raw_facts, dict):
-        return {}, "needs_rule_validation"
+def _validated_resolution(raw_resolution: Any) -> ValidatedResolution:
     try:
-        facts_model = FactsResolved.model_validate(raw_facts)
-        facts = facts_model.model_dump(exclude_none=True)
-        encoded = json.dumps(facts, ensure_ascii=False, allow_nan=False)
-    except (ValidationError, TypeError, ValueError):
-        return {}, "needs_rule_validation"
-
-    if facts.get("status") != "resolved" or len(encoded.encode("utf-8")) > MAX_FACTS_BYTES:
-        return {}, "needs_rule_validation"
-    changes = facts.get("state_changes", [])
-    if not isinstance(changes, list) or len(changes) > MAX_STATE_CHANGES:
-        return {}, "needs_rule_validation"
-    for change in changes:
-        if not isinstance(change, dict) or set(change) != {"key", "value"}:
-            return {}, "needs_rule_validation"
-        if not isinstance(change["key"], str) or not STATE_KEY_RE.fullmatch(change["key"]):
-            return {}, "needs_rule_validation"
-    return facts, "resolved"
+        return validate_resolution_response(raw_resolution)
+    except ResolutionContractError:
+        return fail_closed_resolution()
 
 
-def _rule_feedback(resolution: Any, status: str) -> dict[str, str] | None:
-    if status in ("not_required", "narrative_only", "resolved"):
+def _rule_feedback(resolution: ValidatedResolution) -> dict[str, str] | None:
+    status = resolution.status
+    if status == "resolved":
         return None
-    raw_reason = None
-    if isinstance(resolution, dict):
-        raw_reason = resolution.get("reason") or resolution.get("message")
+    raw_reason = resolution.reason
     if isinstance(raw_reason, str) and raw_reason.strip():
         message = raw_reason.strip()[:MAX_FEEDBACK_LENGTH]
     elif status == "needs_rule_validation":
         message = "O Rule Engine ainda não validou esta regra; nenhuma mudança mecânica foi aplicada."
     else:
         message = "O Rule Engine não resolveu esta ação; nenhuma mudança mecânica foi aplicada."
-    feedback_type = "invalid_action" if status in {"invalid", "invalid_action", "rejected"} else "rule_validation"
+    feedback_type = "invalid_action" if status == "invalid_action" else "rule_validation"
     return {"type": feedback_type, "status": status, "message": message}
 
 
-def _apply_authorized_changes(campaign: dict[str, Any], facts: dict[str, Any]) -> None:
-    if facts.get("status") != "resolved":
+def _apply_authorized_changes(
+    campaign: dict[str, Any], status: str, state_changes: dict[str, Any]
+) -> None:
+    if status != "resolved" or not state_changes:
         return
     mechanical_state = campaign.get("mechanical_state")
     if not isinstance(mechanical_state, dict):
         mechanical_state = {}
         campaign["mechanical_state"] = mechanical_state
-    for change in facts.get("state_changes", []):
-        mechanical_state[change["key"]] = change["value"]
+    mechanical_state.update(state_changes)
 
 
 def _now() -> str:
@@ -141,10 +115,12 @@ async def process_turn(campaign_id: str, player_input: str):
     )
     # All player input is interpreted by the Rule Engine before the narrator,
     # including dialogue; the lexical label above never gates this request.
-    resolution = await rules.resolve(player_input, rule_state)
-    facts, resolution_status = _validated_facts(resolution)
-    _apply_authorized_changes(campaign, facts)
-    feedback = _rule_feedback(resolution, resolution_status)
+    raw_resolution = await rules.resolve(player_input, rule_state)
+    resolution = _validated_resolution(raw_resolution)
+    facts = resolution.narrator_facts
+    resolution_status = resolution.status
+    _apply_authorized_changes(campaign, resolution_status, resolution.state_changes)
+    feedback = _rule_feedback(resolution)
 
     turn_record = {
         "turn_id": str(uuid.uuid4()),

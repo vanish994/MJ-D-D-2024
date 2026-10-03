@@ -11,6 +11,7 @@ from app.config import settings
 from app.main import app
 from app.services import turn_service
 from app.services.campaign_service import get, save
+from app.services.resolution_contract import RULE_RESOLUTION_SCHEMA_VERSION
 
 
 class UXApiTests(unittest.TestCase):
@@ -97,6 +98,7 @@ class UXApiTests(unittest.TestCase):
     def test_invalid_action_reason_is_returned_from_engine_and_facts_stay_empty(self):
         campaign_id = self._campaign_id()
         fake_rules = SimpleNamespace(resolve=AsyncMock(return_value={
+            "schema_version": RULE_RESOLUTION_SCHEMA_VERSION,
             "status": "invalid_action",
             "reason": "A Ação Bônus já foi utilizada neste turno.",
         }))
@@ -127,12 +129,12 @@ class UXApiTests(unittest.TestCase):
             "effects_continuing": [{"name": "effect-kept-by-engine"}],
         }
         fake_rules = SimpleNamespace(resolve=AsyncMock(return_value={
+            "schema_version": RULE_RESOLUTION_SCHEMA_VERSION,
             "status": "resolved",
-            "facts_resolvidos": {
-                "status": "resolved",
-                "action": "long_rest",
-                "long_rest_summary": summary,
-            },
+            "action": {"type": "long_rest", "actor_id": "character_001"},
+            "request": {"player_input": "Faço um descanso longo."},
+            "facts_resolvidos": {},
+            "long_rest_summary": summary,
         }))
         fake_mimo = SimpleNamespace(narrate=AsyncMock(return_value="A noite termina."))
         with (

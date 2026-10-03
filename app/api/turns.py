@@ -11,6 +11,8 @@ router = APIRouter(prefix="/v1/campaigns", tags=["turns"])
 
 def _long_rest_summary(facts: dict):
     action = facts.get("action")
+    if isinstance(action, dict):
+        action = action.get("type")
     if not isinstance(action, str) or action.casefold() not in {"long_rest", "long rest"}:
         return None
     return format_long_rest_summary(facts.get("long_rest_summary"))

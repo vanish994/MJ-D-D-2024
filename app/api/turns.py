@@ -5,7 +5,6 @@ from app.services.errors import CampaignNotFound, ExternalServiceError
 from app.services.turn_service import process_turn
 from app.services.ux_assistant import format_long_rest_summary
 
-
 router = APIRouter(prefix="/v1/campaigns", tags=["turns"])
 
 
@@ -26,15 +25,32 @@ async def turn(campaign_id: str, body: TurnRequest):
             detail="stream=true is not supported by this MVP; use stream=false",
         )
     try:
-        campaign, facts, narrative, resolution_status, turn_id, feedback = await process_turn(
-            campaign_id, body.player_input
+        (
+            campaign,
+            facts,
+            narrative,
+            resolution_status,
+            turn_id,
+            feedback,
+        ) = await process_turn(
+            campaign_id,
+            body.player_input,
+            mechanical_action=(
+                body.mechanical_action.model_dump()
+                if body.mechanical_action is not None
+                else None
+            ),
         )
     except CampaignNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ExternalServiceError as exc:
         raise HTTPException(
             status_code=502,
-            detail={"code": "upstream_error", "service": exc.service, "operation": exc.operation},
+            detail={
+                "code": "upstream_error",
+                "service": exc.service,
+                "operation": exc.operation,
+            },
         ) from exc
     return {
         "campaign": campaign,

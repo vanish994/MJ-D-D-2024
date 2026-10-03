@@ -27,11 +27,11 @@ class RuleEngineClient:
 
     async def resolve(
         self,
-        player_input: str,
+        player_input: str | dict,
         state: dict,
         rule_ids: list[str] | None = None,
     ) -> dict:
-        """Send player input via the external contract's existing `action` field."""
+        """Send free text or an explicitly structured action in the existing field."""
         return await self._post_json(
             "/v1/resolve",
             {"action": player_input, "state": state, "rule_ids": rule_ids or []},

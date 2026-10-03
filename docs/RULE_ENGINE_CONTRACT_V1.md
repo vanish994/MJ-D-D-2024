@@ -2,7 +2,7 @@
 
 ## Escopo e compatibilidade
 
-`mj-rule-state-v1` versiona o objeto enviado **dentro do campo `state`** pelo adapter do MJ. Ele não é uma nova versão da rota externa nem altera o payload HTTP de `/v1/resolve`. O adapter continua enviando a fala original em `action`, o estado versionado em `state` e a lista existente `rule_ids` (vazia por padrão):
+`mj-rule-state-v1` versiona o objeto enviado **dentro do campo `state`** pelo adapter do MJ. Ele não é uma nova versão da rota externa. O adapter continua enviando `action`, o estado versionado em `state` e a lista existente `rule_ids` (vazia por padrão). Sem `mechanical_action`, `action` continua sendo a fala original; com `mechanical_action` explicitamente validada, `action` é o objeto `ability_check` já fornecido pelo cliente:
 
 ```json
 {
@@ -24,7 +24,7 @@
 }
 ```
 
-O formato acima é montado pelo MJ em `app/services/turn_contract.py`. O `dnd-byonder-backend` atual aceita `state` como um dicionário genérico, mas seu resolver `/v1/resolve` não consome esses campos: enquanto não houver mecânica validada, ele pode retornar `needs_rule_validation` e `facts_resolvidos: {}`. Portanto, o estado estruturado prepara o contrato do lado MJ; **não significa que a integração externa já interpreta ficha, inventário ou cena**. A busca `/v1/rules/search` continua sendo apenas evidência e nunca é tratada como resolução.
+O formato de `state` acima é montado pelo MJ em `app/services/turn_contract.py`. O campo `state` permanece contexto opaco: ficha, inventário e cena não são interpretados para inventar a ação, ability, DC ou modificador. O único caminho mecânico deste marco é o objeto opcional `mechanical_action` fornecido explicitamente no request de turno e encaminhado como `action`; sem ele, a fala continua texto livre. A busca `/v1/rules/search` continua sendo apenas evidência e nunca é tratada como resolução.
 
 ## Pipeline
 
@@ -35,7 +35,7 @@ classify_intent(player_input)                 # rótulo auxiliar
     ↓
 build_rule_state(...)                         # transporte tipado/versionado
     ↓
-POST /v1/resolve { action, state, rule_ids }   # rota externa preservada
+POST /v1/resolve { action, state, rule_ids }   # texto antigo ou ability_check explícito
     ↓
 validação da resposta pelo MJ
     ├── resposta e fatos resolvidos válidos → aplicar somente state_changes
@@ -89,7 +89,7 @@ O retorno ao MiMo será `FATOS_RESOLVIDOS: {}` e o estado da campanha não muda.
 
 - transportar campanha, fala e estado existente no envelope versionado;
 - gerar somente a classificação auxiliar de intenção;
-- manter o formato externo atual de `/v1/resolve`;
+- manter o formato externo atual de `/v1/resolve` e transportar o `ability_check` explícito somente no campo `action` já existente;
 - validar formato/status dos fatos recebidos;
 - aplicar apenas mudanças autorizadas por fatos resolvidos válidos;
 - enviar fatos válidos ou `{}` ao narrador.

@@ -3,7 +3,7 @@
 ```text
 Jogador
    ↓
-MJ-D-D-2024 — recebe a fala e classifica a intenção como indicação auxiliar
+MJ-D-D-2024 — recebe a fala, classifica a intenção como metadado e monta `mj-rule-state-v1`
    ↓
 Rule Engine /v1/resolve — chamado para TODA entrada, inclusive diálogo
    ↓
@@ -21,7 +21,9 @@ Persistir narrativa concluída ou marcar turno como failed
 Jogador
 ```
 
-**Não há atalho do MJ diretamente ao MiMo.** A classificação lexical é apenas registrada como `intent_classification`; ela não determina sucesso, fracasso ou cálculo e não decide se o Rule Engine será chamado. Se o Rule Engine falhar, o turno não é enviado ao narrador e o endpoint retorna erro upstream. Se ele responder `narrative_only`, o MiMo recebe fatos `{}`. Se retornar `needs_rule_validation`, resolução inválida ou fatos malformados, o MiMo também recebe `{}` e o estado mecânico permanece inalterado. Um erro do MiMo deixa um registro de turno `failed`; se a mecânica já foi validada, os fatos e mudanças válidas continuam registrados.
+**Não há atalho do MJ diretamente ao MiMo.** `build_rule_state()` coloca `campaign_id`, `character`, `mechanical_state`, `inventory`, `resources`, `scene` e `intent` dentro do campo externo `state`. Campos opcionais ausentes usam somente os defaults vazios documentados; o builder não calcula regras. O adapter mantém o formato `/v1/resolve` (`action`, `state`, `rule_ids`) sem alteração. A classificação lexical é apenas registrada como metadado; ela não determina sucesso, fracasso ou cálculo e não decide se o Rule Engine será chamado. Se o Rule Engine falhar, o turno não é enviado ao narrador e o endpoint retorna erro upstream. Se ele responder `narrative_only`, o MiMo recebe fatos `{}`. Se retornar `needs_rule_validation`, resolução inválida ou fatos malformados, o MiMo também recebe `{}` e o estado mecânico permanece inalterado. Um erro do MiMo deixa um registro de turno `failed`; se a mecânica já foi validada, os fatos e mudanças válidas continuam registrados.
+
+O schema `mj-rule-state-v1` é local ao MJ: o backend externo atual aceita o `state` como dict genérico, mas não consome os campos para resolver mecânicas. Consulte [`RULE_ENGINE_CONTRACT_V1.md`](RULE_ENGINE_CONTRACT_V1.md).
 
 ## Ajuda de combate
 

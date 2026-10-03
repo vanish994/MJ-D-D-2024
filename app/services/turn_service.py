@@ -12,6 +12,7 @@ from app.services.campaign_service import get, save
 from app.services.errors import CampaignNotFound, ExternalServiceError
 from app.services.mimo_client import MimoClient
 from app.services.rule_engine_client import RuleEngineClient
+from app.services.turn_contract import build_rule_state
 
 
 rules = RuleEngineClient()
@@ -128,9 +129,19 @@ async def process_turn(campaign_id: str, player_input: str):
     mechanical_state = campaign.get("mechanical_state", {})
     if not isinstance(mechanical_state, dict):
         mechanical_state = {}
+    rule_state = build_rule_state(
+        campaign_id=campaign_id,
+        player_input=player_input,
+        intent_classification=intent_classification,
+        character=campaign.get("character"),
+        mechanical_state=mechanical_state,
+        inventory=campaign.get("inventory"),
+        resources=campaign.get("resources"),
+        scene=campaign.get("scene"),
+    )
     # All player input is interpreted by the Rule Engine before the narrator,
     # including dialogue; the lexical label above never gates this request.
-    resolution = await rules.resolve(player_input, mechanical_state)
+    resolution = await rules.resolve(player_input, rule_state)
     facts, resolution_status = _validated_facts(resolution)
     _apply_authorized_changes(campaign, facts)
     feedback = _rule_feedback(resolution, resolution_status)

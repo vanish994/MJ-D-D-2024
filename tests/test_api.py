@@ -11,6 +11,7 @@ from app.config import settings
 from app.main import app
 from app.services import turn_service
 from app.services.campaign_service import get, save
+from app.services.turn_contract import build_rule_state
 
 
 class OrchestratorApiTests(unittest.TestCase):
@@ -75,7 +76,19 @@ class OrchestratorApiTests(unittest.TestCase):
         async def resolve(action, state):
             events.append("rule_engine")
             self.assertEqual(action, "Converso com o mercador.")
-            self.assertEqual(state, {})
+            self.assertEqual(
+                state,
+                build_rule_state(
+                    campaign_id=campaign_id,
+                    player_input="Converso com o mercador.",
+                    intent_classification="narrative_or_unknown",
+                    character={},
+                    mechanical_state={},
+                    inventory=[],
+                    resources={},
+                    scene={},
+                ),
+            )
             return {"status": "narrative_only"}
 
         async def narrate(*args):

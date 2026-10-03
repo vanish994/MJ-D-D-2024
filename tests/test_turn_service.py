@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 from app.services.errors import ExternalServiceError
 from app.services import turn_service
+from app.services.turn_contract import build_rule_state
 
 
 def resolved_response():
@@ -149,7 +150,17 @@ class TurnServiceTests(unittest.IsolatedAsyncioTestCase):
                 "campaign-test", "Converso com o mercador sobre a viagem."
             )
         fake_rules.resolve.assert_awaited_once_with(
-            "Converso com o mercador sobre a viagem.", {"hp": 10}
+            "Converso com o mercador sobre a viagem.",
+            build_rule_state(
+                campaign_id="campaign-test",
+                player_input="Converso com o mercador sobre a viagem.",
+                intent_classification="narrative_or_unknown",
+                character={},
+                mechanical_state={"hp": 10},
+                inventory=[],
+                resources={},
+                scene={},
+            ),
         )
         self.assertEqual(events, ["rule_engine", "mimo"])
         self.assertEqual(facts, {})

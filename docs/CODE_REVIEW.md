@@ -14,8 +14,8 @@ O PR implementa um backend FastAPI para o MJ, com campanhas, orquestração Rule
 ## Pendências funcionais e de integração
 
 1. **Rule Engine real ainda fail-closed.** A revisão fornecida pelo usuário informa que o `/v1/resolve` atual retorna `needs_rule_validation` e fatos vazios. Não foi feita chamada real nesta tarefa; de acordo com essa checagem, ataques, testes, dano, CDs e descanso ainda não são resolvidos. A implementação correta no MJ é não inventar resultado; a resolução determinística pertence a uma etapa separada do motor de regras.
-2. **Integração real não testada.** Os 47 testes usam mocks. Faltam URLs/credenciais reais e chamadas aos endpoints reais `/health`, `/v1/resolve` e `/v1/chat/completions`.
-3. **Contrato de intenção é provisório.** `RuleEngineClient.resolve` recebe agora `player_input`, mas o endpoint externo espera a chave JSON `action`; o adapter envia a fala original nesse campo para preservar compatibilidade. A decomposição ator/alvo/movimento/arma/contexto exige contrato versionado e compatível com o serviço externo; não alterar um lado unilateralmente.
+2. **Integração real não testada.** Os 52 testes usam mocks. Faltam URLs/credenciais reais e chamadas aos endpoints reais `/health`, `/v1/resolve` e `/v1/chat/completions`.
+3. **Contrato de intenção é provisório.** O MJ agora envolve o estado da campanha em `mj-rule-state-v1`, mas `intent` continua sendo classificação lexical + fala original, sem parser estruturado de ator/alvo/movimento/arma. `RuleEngineClient.resolve` continua enviando `player_input` na chave externa `action` para preservar compatibilidade; o backend externo ainda não interpreta o novo envelope. Não alterar um lado unilateralmente.
 4. **UX depende de dados inexistentes no contrato real.** Opções, recursos, snapshots atuais e resumo de descanso só aparecem se fornecidos e validados pelo Rule Engine. A projeção falha de forma segura, mas provavelmente retornará indisponível com o serviço atual.
 5. **Frontend não incluído.** A API disponibiliza rotas para uma futura UI, mas nenhum frontend foi implementado. O projeto é provider-agnostic; a interface pode ser incluída aqui ou decidida separadamente.
 6. **Explicação progressiva ainda parcial.** O modo avançado oculta `explanation`; iniciantes/normal recebem o texto explícito do Rule Engine. Glossário e orientação visual progressiva exigem conteúdo confiável e UI.
@@ -35,7 +35,7 @@ O PR implementa um backend FastAPI para o MJ, com campanhas, orquestração Rule
 
 ## Cobertura
 
-**47 testes passaram** com dependências fixadas e mocks; o smoke test local de `GET /health` passou. Isso não comprova os serviços reais.
+**52 testes passaram** com dependências fixadas e mocks; o smoke test local de `GET /health` passou. Isso não comprova os serviços reais.
 
 ## Perguntas para a próxima etapa
 

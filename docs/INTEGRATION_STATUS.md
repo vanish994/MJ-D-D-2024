@@ -12,7 +12,7 @@ Quando houver um contrato mecânico disponível, testar no serviço real:
 
 1. `GET {RULE_ENGINE_URL}/health`.
 2. `POST {RULE_ENGINE_URL}/v1/resolve` com diálogo e casos aprovados de ação; conferir autenticação, schema, status e `FATOS_RESOLVIDOS`.
-3. Confirmar um contrato versionado para intenção estruturada e para `ux_snapshot`; hoje o adapter mantém compatibilidade enviando a fala original na chave externa `action`.
+3. Confirmar contrato versionado para intenção estruturada e `ux_snapshot`. O MJ agora envia o envelope local `mj-rule-state-v1` dentro de `state`, mas o adapter preserva a chave externa `action` com a fala original e não altera `/v1/resolve`; o serviço atual não interpreta esse envelope nem resolve mecânicas.
 
 Não alterar `dnd-byonder-backend` sem autorização explícita.
 

@@ -173,11 +173,11 @@ class TurnServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.snapshots[0]["history"][0]["narrative_status"], "pending")
         self.assertEqual(self.snapshots[-1]["history"][0]["narrative_status"], "failed")
 
-    def test_mechanical_router_normalizes_accents_and_word_boundaries(self):
-        self.assertTrue(turn_service.looks_mechanical("Faço um teste de Percepção"))
-        self.assertTrue(turn_service.looks_mechanical("Eu rolo iniciativa"))
-        self.assertFalse(turn_service.looks_mechanical("Converso com o mercador"))
-        self.assertFalse(turn_service.looks_mechanical("O atacante viajou"))
+    def test_intent_classifier_normalizes_accents_and_word_boundaries(self):
+        self.assertEqual(turn_service.classify_intent("Faço um teste de Percepção"), "mechanical_likely")
+        self.assertEqual(turn_service.classify_intent("Eu rolo iniciativa"), "mechanical_likely")
+        self.assertEqual(turn_service.classify_intent("Converso com o mercador"), "narrative_or_unknown")
+        self.assertEqual(turn_service.classify_intent("O atacante viajou"), "narrative_or_unknown")
         self.assertEqual(turn_service.classify_intent("Converso com o mercador"), "narrative_or_unknown")
 
 

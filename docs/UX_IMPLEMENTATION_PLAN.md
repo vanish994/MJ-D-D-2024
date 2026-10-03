@@ -2,21 +2,19 @@
 
 ## Intenção
 
-Adicionar ao backend `MJ-D-D-2024` uma camada de apresentação/assistência configurável que possa explicar o estado do jogo sem se tornar uma fonte de regras. A interface Base44 permanece externa; este repositório não contém o frontend.
+Adicionar ao backend `MJ-D-D-2024` uma camada de apresentação/assistência configurável que explique apenas dados confiáveis do estado do jogo, sem se tornar uma fonte de regras. O frontend ainda não foi implementado; ele pode ser criado neste repositório ou definido separadamente, sem dependência de um fornecedor específico.
 
-## Arquivos previstos e motivo
+## Entregue no backend
 
-- `docs/UX_BEGINNER_SPEC.md`: preservar integralmente a nova especificação recebida.
-- `app/models.py`: definir estruturas opcionais e validadas para o snapshot de combate e os três modos de explicação. Campos mecânicos ausentes permanecem `null`/indisponíveis; nenhum valor padrão de regra será criado.
-- `app/services/ux_assistant.py` (novo): projetar somente dados estruturados fornecidos pelo Rule Engine; formatar avisos, opções e resumo de descanso apenas quando houver fonte explícita. Não calcular disponibilidade, custos, movimento, recuperação nem duração.
-- `app/api/ux.py` (novo) e `app/main.py`: expor uma leitura da projeção para Base44 e uma atualização da preferência de modo, sem permitir que a UI altere o estado mecânico.
-- `app/api/campaigns.py`: inicializar apenas a preferência de apresentação do modo iniciante; isso não define estado de jogo.
-- `app/services/turn_service.py` e `app/api/turns.py`: manter o fail-closed, registrar motivo de recusa somente quando retornado pelo Rule Engine e expor resumo de descanso somente se o serviço entregar os dados estruturados.
-- `tests/test_ux_assistant.py` e `tests/test_api.py`: cobrir recursos disponíveis/indisponíveis, movimento, ação inválida, descanso longo, modos e estados ausentes com dados simulados.
-- `README.md` e `docs/INTEGRATION_STATUS.md`: documentar limitações, setup e a diferença entre mocks e validação real.
+- `docs/UX_BEGINNER_SPEC.md`: preserva a especificação UX recebida.
+- `app/models.py`: estruturas validadas para snapshots e modos; campos ausentes permanecem indisponíveis.
+- `app/services/ux_assistant.py`: projeção somente de dados do Rule Engine; não calcula disponibilidade, custos, movimento, recuperação ou duração.
+- `app/api/ux.py` e `app/main.py`: endpoints de projeção e preferência, sem permitir que a interface altere o estado mecânico.
+- `app/services/turn_service.py` e `app/api/turns.py`: fail-closed, passagem de feedback somente do Rule Engine e resumo de descanso somente quando estruturado.
+- Testes de recursos, movimento, ação inválida, descanso, modos e dados ausentes usando mocks.
 
-## Limites conhecidos
+## Limites
 
-O contrato atual documentado no ZIP não define uma operação do Rule Engine para consultar, em tempo real, a lista de ações válidas, recursos do turno ou estado de descanso longo. Assim, a projeção não inventará nem apresentará opções como atuais sem um snapshot explícito e marcado como atual pelo Rule Engine. O repositório também não contém o frontend Base44, então nenhum botão/UI será criado aqui.
+O contrato atual do Rule Engine não define uma operação real para consultar opções válidas, recursos do turno ou duração de efeitos. A camada não inventa esses valores e exige snapshot explícito marcado como atual. Como o `/v1/resolve` está atualmente fail-closed segundo a revisão recebida, a UX de combate não estará funcional até existir suporte real no motor de regras.
 
-Os mocks validam somente o contrato local. A integração só poderá ser considerada real depois da configuração de URLs e credenciais e de testes contra `/health`, `/v1/resolve` e `/v1/chat/completions` nos serviços reais. Nenhum arquivo de `dnd-byonder-backend` ou `mimo-ai-proxy` será modificado.
+Os mocks validam somente o contrato local. Integração real depende de URLs/credenciais e chamadas a `/health`, `/v1/resolve` e `/v1/chat/completions`. Nenhum repositório de serviço externo foi modificado; nenhuma implantação foi feita.

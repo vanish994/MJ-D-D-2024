@@ -27,7 +27,7 @@ class ExternalClientMockTests(unittest.IsolatedAsyncioTestCase):
         )
         client = RuleEngineClient(transport=httpx.MockTransport(handler))
         with patch("app.services.rule_engine_client.settings", config):
-            result = await client.resolve("Eu tento atacar.", {"hp": 10})
+            result = await client.resolve(player_input="Eu tento atacar.", state={"hp": 10})
 
         self.assertEqual(result, {"status": "needs_rule_validation"})
         self.assertEqual(observed["url"], "https://rules.example.test/v1/resolve")

@@ -13,7 +13,7 @@ O contrato valida e projeta dados; **não implementa regras, testes, RNG, dano, 
   "schema_version": "rule-resolution-v1",
   "resolution_id": "res_123",
   "status": "resolved",
-  "action": { "type": "ability_check", "actor_id": "character_001" },
+  "action": { "type": "ability_check", "ability": "strength", "actor_id": "character_001" },
   "request": { "player_input": "Eu tento abrir a porta." },
   "check": { "ability": "strength", "skill": null, "dc": 15, "modifier": 3 },
   "rolls": [{ "type": "d20", "result": 14 }],
@@ -26,7 +26,7 @@ O contrato valida e projeta dados; **não implementa regras, testes, RNG, dano, 
 }
 ```
 
-Os campos além de `schema_version` e `status` são opcionais. O consumidor não os preenche com defaults que representem fatos mecânicos. Um objeto `facts_resolvidos` não vazio precisa satisfazer o schema conhecido do MJ e declarar `status: "resolved"`; `{}` significa que não há fatos aninhados adicionais.
+Os campos além de `schema_version` e `status` são opcionais. Para `action`, `ability` também pode estar presente com um dos seis valores de atributo aceitos; campos desconhecidos continuam rejeitados. O consumidor não preenche campos com defaults que representem fatos mecânicos. Um objeto `facts_resolvidos` não vazio precisa satisfazer o schema conhecido do MJ e declarar `status: "resolved"`; `{}` significa que não há fatos aninhados adicionais.
 
 Um status pendente versionado também pode ser mínimo e não exige `outcome`:
 

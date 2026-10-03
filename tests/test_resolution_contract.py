@@ -67,13 +67,23 @@ class ResolutionContractTests(unittest.TestCase):
         self.assertNotIn("request", result.narrator_facts)
         self.assertNotIn("long_rest_summary", result.narrator_facts)
 
+    def test_ability_check_action_ability_is_preserved_in_rule_resolution_v1(self):
+        payload = self.resolved_payload()
+        payload["action"]["ability"] = "strength"
+
+        result = validate_resolution_response(payload)
+
+        self.assertEqual(result.narrator_facts["action"]["ability"], "strength")
+
     def test_awaiting_roll_does_not_require_outcome(self):
-        result = validate_resolution_response({
-            "schema_version": RULE_RESOLUTION_SCHEMA_VERSION,
-            "status": "awaiting_roll",
-            "action": {"type": "ability_check"},
-            "check": {"ability": "strength", "dc": 15},
-        })
+        result = validate_resolution_response(
+            {
+                "schema_version": RULE_RESOLUTION_SCHEMA_VERSION,
+                "status": "awaiting_roll",
+                "action": {"type": "ability_check"},
+                "check": {"ability": "strength", "dc": 15},
+            }
+        )
         self.assertEqual(result.status, "awaiting_roll")
         self.assertEqual(result.narrator_facts, {})
         self.assertEqual(result.state_changes, {})

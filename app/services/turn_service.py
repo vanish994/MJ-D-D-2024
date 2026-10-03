@@ -17,7 +17,6 @@ from app.services.resolution_contract import (
 from app.services.rule_engine_client import RuleEngineClient
 from app.services.turn_contract import build_rule_state
 
-
 rules = RuleEngineClient()
 mimo = MimoClient()
 MECHANICAL_TERMS = (
@@ -95,7 +94,11 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-async def process_turn(campaign_id: str, player_input: str):
+async def process_turn(
+    campaign_id: str,
+    player_input: str,
+    mechanical_action: dict[str, Any] | None = None,
+):
     campaign = get(campaign_id)
     if not campaign:
         raise CampaignNotFound("campaign not found")
@@ -116,7 +119,8 @@ async def process_turn(campaign_id: str, player_input: str):
     )
     # All player input is interpreted by the Rule Engine before the narrator,
     # including dialogue; the lexical label above never gates this request.
-    raw_resolution = await rules.resolve(player_input, rule_state)
+    action = mechanical_action if mechanical_action is not None else player_input
+    raw_resolution = await rules.resolve(action, rule_state)
     resolution = _validated_resolution(raw_resolution)
     facts = resolution.narrator_facts
     resolution_status = resolution.status

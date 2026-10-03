@@ -1,7 +1,7 @@
 import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
 
 from app.services.ux_assistant import CombatUXSnapshot, LongRestSummary
 
@@ -39,11 +39,31 @@ class CampaignUXSettingsUpdate(BaseModel):
     explanation_mode: Literal["beginner", "normal", "advanced"]
 
 
+class AbilityCheckAction(BaseModel):
+    """Explicit mechanical input; all adjudication remains with the Rule Engine."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["ability_check"]
+    ability: Literal[
+        "strength",
+        "dexterity",
+        "constitution",
+        "intelligence",
+        "wisdom",
+        "charisma",
+    ]
+    dc: StrictInt = Field(ge=1)
+    # Keep aligned with the Rule Engine's current accepted modifier bound.
+    modifier: StrictInt = Field(ge=-100_000, le=100_000)
+
+
 class TurnRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     player_input: str = Field(min_length=1, max_length=10_000)
     stream: bool = False
+    mechanical_action: AbilityCheckAction | None = None
 
     @field_validator("player_input")
     @classmethod

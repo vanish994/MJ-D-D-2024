@@ -96,6 +96,17 @@ class _StrictModel(BaseModel):
 class _Action(_StrictModel):
     type: StrictStr
     actor_id: StrictStr | None = None
+    ability: (
+        Literal[
+            "strength",
+            "dexterity",
+            "constitution",
+            "intelligence",
+            "wisdom",
+            "charisma",
+        ]
+        | None
+    ) = None
 
 
 class _Request(_StrictModel):

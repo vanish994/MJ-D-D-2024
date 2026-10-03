@@ -207,12 +207,259 @@ class OrchestratorApiTests(unittest.TestCase):
         self.assertEqual(narrator_input["FATOS_RESOLVIDOS"], expected_facts)
         self.assertEqual(narrator_input["ux_context"], {})
 
+    def test_explicit_ability_check_flows_through_rule_engine_contract_to_mimo(self):
+        observed = {"rule_requests": [], "mimo_requests": []}
+        resolution = {
+            "schema_version": RULE_RESOLUTION_SCHEMA_VERSION,
+            "resolution_id": "ability-check-test",
+            "status": "resolved",
+            "action": {"type": "ability_check", "ability": "strength"},
+            "check": {"ability": "strength", "dc": 15, "modifier": 3},
+            "rolls": [{"type": "d20", "result": 14}],
+            "outcome": {"total": 17, "success": True},
+            "rules_used": ["ability_check.mvp.v1"],
+        }
+
+        async def rule_handler(request):
+            observed["rule_requests"].append(request)
+            return httpx.Response(200, json=resolution)
+
+        async def mimo_handler(request):
+            observed["mimo_requests"].append(json.loads(request.content))
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": "A porta cede sob sua força."}}]
+                },
+            )
+
+        runtime_settings = replace(
+            settings,
+            rule_engine_url="https://rules.example.test",
+            rule_engine_api_key="configured-rule-key",
+            mimo_url="https://mimo.example.test",
+            mimo_api_key="mock-mimo-key",
+        )
+        rules_client = RuleEngineClient(transport=httpx.MockTransport(rule_handler))
+        mimo_client = MimoClient(transport=httpx.MockTransport(mimo_handler))
+        campaign_id = self._create_campaign_with_scene(
+            {"type": "exploration", "description": "Uma porta fechada."}
+        )
+
+        with (
+            patch.object(turn_service, "rules", rules_client),
+            patch.object(turn_service, "mimo", mimo_client),
+            patch("app.services.rule_engine_client.settings", runtime_settings),
+            patch("app.services.mimo_client.settings", runtime_settings),
+        ):
+            response = self.client.post(
+                f"/v1/campaigns/{campaign_id}/turn",
+                json={
+                    "player_input": "Eu tento abrir a porta.",
+                    "mechanical_action": {
+                        "type": "ability_check",
+                        "ability": "strength",
+                        "dc": 15,
+                        "modifier": 3,
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        result = response.json()
+        self.assertEqual(result["resolution_status"], "resolved")
+        self.assertEqual(
+            result["facts_resolvidos"]["rolls"], [{"type": "d20", "result": 14}]
+        )
+        self.assertEqual(
+            result["facts_resolvidos"]["outcome"], {"total": 17, "success": True}
+        )
+        self.assertEqual(len(observed["rule_requests"]), 1)
+        rule_request = observed["rule_requests"][0]
+        self.assertEqual(str(rule_request.url), "https://rules.example.test/v1/resolve")
+        self.assertEqual(rule_request.headers["X-API-Key"], "configured-rule-key")
+        sent = json.loads(rule_request.content)
+        self.assertEqual(
+            sent["action"],
+            {"type": "ability_check", "ability": "strength", "dc": 15, "modifier": 3},
+        )
+        self.assertEqual(sent["state"]["schema_version"], "mj-rule-state-v1")
+        self.assertEqual(sent["state"]["campaign_id"], campaign_id)
+        self.assertEqual(sent["rule_ids"], [])
+
+        self.assertEqual(len(observed["mimo_requests"]), 1)
+        user_content = observed["mimo_requests"][0]["messages"][1]["content"]
+        narrator_input = json.loads(user_content.split("\n", 1)[1])
+        self.assertEqual(narrator_input["schema_version"], "narrator-input-v1")
+        self.assertEqual(narrator_input["player_input"], "Eu tento abrir a porta.")
+        self.assertEqual(narrator_input["resolved_facts"], result["facts_resolvidos"])
+        self.assertEqual(narrator_input["FATOS_RESOLVIDOS"], result["facts_resolvidos"])
+        self.assertEqual(narrator_input["resolved_facts"]["rolls"][0]["result"], 14)
+        self.assertEqual(narrator_input["resolved_facts"]["outcome"]["total"], 17)
+        self.assertTrue(narrator_input["resolved_facts"]["outcome"]["success"])
+        self.assertEqual(narrator_input["resolved_facts"]["check"]["dc"], 15)
+        self.assertEqual(narrator_input["resolved_facts"]["check"]["modifier"], 3)
+
+    def test_current_unversioned_backend_ability_response_fails_closed(self):
+        observed = {"mimo": []}
+        # This mirrors the current Marco 2 endpoint shape, which is not rule-resolution-v1.
+        backend_response = {
+            "status": "resolved",
+            "action": {"type": "ability_check", "ability": "strength"},
+            "check": {"dc": 15, "modifier": 3},
+            "rolls": [{"type": "d20", "result": 14}],
+            "outcome": {"total": 17, "success": True},
+            "rule_id": "ability_check.mvp.v1",
+            "facts_resolvidos": {
+                "status": "resolved",
+                "action": {"type": "ability_check", "ability": "strength"},
+                "check": {"dc": 15, "modifier": 3},
+                "rolls": [{"type": "d20", "result": 14}],
+                "outcome": {"total": 17, "success": True},
+                "rule_id": "ability_check.mvp.v1",
+            },
+        }
+
+        async def rule_handler(_request):
+            return httpx.Response(200, json=backend_response)
+
+        async def mimo_handler(request):
+            observed["mimo"].append(json.loads(request.content))
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {"message": {"content": "A tentativa segue indefinida."}}
+                    ]
+                },
+            )
+
+        runtime_settings = replace(
+            settings,
+            rule_engine_url="https://rules.example.test",
+            mimo_url="https://mimo.example.test",
+            mimo_api_key="",
+        )
+        rules_client = RuleEngineClient(transport=httpx.MockTransport(rule_handler))
+        mimo_client = MimoClient(transport=httpx.MockTransport(mimo_handler))
+        campaign_id = self._create_campaign_with_scene({"type": "exploration"})
+
+        with (
+            patch.object(turn_service, "rules", rules_client),
+            patch.object(turn_service, "mimo", mimo_client),
+            patch("app.services.rule_engine_client.settings", runtime_settings),
+            patch("app.services.mimo_client.settings", runtime_settings),
+        ):
+            response = self.client.post(
+                f"/v1/campaigns/{campaign_id}/turn",
+                json={
+                    "player_input": "Eu tento abrir a porta.",
+                    "mechanical_action": {
+                        "type": "ability_check",
+                        "ability": "strength",
+                        "dc": 15,
+                        "modifier": 3,
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        result = response.json()
+        self.assertEqual(result["facts_resolvidos"], {})
+        self.assertEqual(result["resolution_status"], "needs_rule_validation")
+        self.assertEqual(get(campaign_id)["mechanical_state"], {})
+        user_content = observed["mimo"][0]["messages"][1]["content"]
+        narrator_input = json.loads(user_content.split("\n", 1)[1])
+        self.assertEqual(narrator_input["resolved_facts"], {})
+        self.assertEqual(narrator_input["FATOS_RESOLVIDOS"], {})
+
+    def test_mechanical_action_is_strictly_validated_at_turn_endpoint(self):
+        campaign_id = self.client.post(
+            "/v1/campaigns", json={"name": "Campanha"}
+        ).json()["id"]
+        invalid_actions = (
+            {"type": "ability_check", "ability": "athletics", "dc": 15, "modifier": 3},
+            {"type": "ability_check", "ability": "strength", "modifier": 3},
+            {"type": "ability_check", "ability": "strength", "dc": 15},
+            {"type": "ability_check", "ability": "strength", "dc": 0, "modifier": 3},
+            {"type": "ability_check", "ability": "strength", "dc": "15", "modifier": 3},
+            {"type": "ability_check", "ability": "strength", "dc": 15, "modifier": "3"},
+            {
+                "type": "ability_check",
+                "ability": "strength",
+                "dc": 15,
+                "modifier": 100_001,
+            },
+            {
+                "type": "ability_check",
+                "ability": "strength",
+                "dc": 15,
+                "modifier": 3,
+                "advantage": True,
+            },
+            {"type": "saving_throw", "ability": "strength", "dc": 15, "modifier": 3},
+        )
+        for action in invalid_actions:
+            with self.subTest(action=action):
+                response = self.client.post(
+                    f"/v1/campaigns/{campaign_id}/turn",
+                    json={
+                        "player_input": "Eu tento abrir a porta.",
+                        "mechanical_action": action,
+                    },
+                )
+                self.assertEqual(response.status_code, 422, response.text)
+
+    def test_rule_engine_connection_failure_returns_no_facts_or_narration(self):
+        async def rule_handler(request):
+            raise httpx.ConnectError("backend unavailable", request=request)
+
+        async def mimo_handler(_request):
+            self.fail("Mimo must not be called when the Rule Engine is unavailable")
+
+        runtime_settings = replace(
+            settings,
+            rule_engine_url="https://rules.example.test",
+            rule_engine_api_key="configured-rule-key",
+            mimo_url="https://mimo.example.test",
+            mimo_api_key="",
+        )
+        rules_client = RuleEngineClient(transport=httpx.MockTransport(rule_handler))
+        mimo_client = MimoClient(transport=httpx.MockTransport(mimo_handler))
+        campaign_id = self._create_campaign_with_scene({"type": "exploration"})
+
+        with (
+            patch.object(turn_service, "rules", rules_client),
+            patch.object(turn_service, "mimo", mimo_client),
+            patch("app.services.rule_engine_client.settings", runtime_settings),
+            patch("app.services.mimo_client.settings", runtime_settings),
+        ):
+            response = self.client.post(
+                f"/v1/campaigns/{campaign_id}/turn",
+                json={
+                    "player_input": "Eu tento abrir a porta.",
+                    "mechanical_action": {
+                        "type": "ability_check",
+                        "ability": "strength",
+                        "dc": 15,
+                        "modifier": 3,
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 502, response.text)
+        self.assertEqual(response.json()["detail"]["service"], "rule_engine")
+        self.assertEqual(get(campaign_id)["mechanical_state"], {})
+
     def test_health_and_campaign_create_get(self):
         health = self.client.get("/health")
         self.assertEqual(health.status_code, 200)
         self.assertEqual(health.json()["service"], "MJ-D-D-2024")
 
-        created = self.client.post("/v1/campaigns", json={"name": "  A Jornada  ", "character": {"class": "Ranger"}})
+        created = self.client.post(
+            "/v1/campaigns",
+            json={"name": "  A Jornada  ", "character": {"class": "Ranger"}},
+        )
         self.assertEqual(created.status_code, 201)
         data = created.json()
         self.assertEqual(data["name"], "A Jornada")
@@ -228,8 +475,12 @@ class OrchestratorApiTests(unittest.TestCase):
         campaign["mechanical_state"] = {"hp": 12}
         save(campaign)
 
-        fake_rules = SimpleNamespace(resolve=AsyncMock(return_value={"status": "needs_rule_validation"}))
-        fake_mimo = SimpleNamespace(narrate=AsyncMock(return_value="A tentativa fica em aberto."))
+        fake_rules = SimpleNamespace(
+            resolve=AsyncMock(return_value={"status": "needs_rule_validation"})
+        )
+        fake_mimo = SimpleNamespace(
+            narrate=AsyncMock(return_value="A tentativa fica em aberto.")
+        )
         with (
             patch.object(turn_service, "rules", fake_rules),
             patch.object(turn_service, "mimo", fake_mimo),
@@ -248,7 +499,9 @@ class OrchestratorApiTests(unittest.TestCase):
         self.assertEqual(fake_mimo.narrate.await_args.args[0].resolved_facts, {})
 
     def test_dialogue_turn_calls_rule_engine_before_mimo(self):
-        campaign_id = self.client.post("/v1/campaigns", json={"name": "Campanha"}).json()["id"]
+        campaign_id = self.client.post(
+            "/v1/campaigns", json={"name": "Campanha"}
+        ).json()["id"]
         events = []
 
         async def resolve(action, state):

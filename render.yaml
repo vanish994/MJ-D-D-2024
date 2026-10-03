@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: mj-d-d-2024
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: RULE_ENGINE_URL
+        sync: false
+      - key: RULE_ENGINE_API_KEY
+        sync: false
+      - key: MIMO_URL
+        sync: false
+      - key: MIMO_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
